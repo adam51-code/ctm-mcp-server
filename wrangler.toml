@@ -1,0 +1,8 @@
+name = "ctm-mcp-server"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+[vars]
+CTM_API_HOST = "api.calltrackingmetrics.com"
+CTM_BASE_PATH = "api/v1"
+MCP_AUTH_TOKEN = "myMakeServer2026!"
