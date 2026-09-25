@@ -253,6 +253,27 @@ async function handleRpc(request, env) {
   const body = await request.json();
   const { id, method, params } = body;
 
+  // MCP initialize handshake
+  if (method === "initialize") {
+    return jsonResponse({
+      jsonrpc: "2.0",
+      id,
+      result: {
+        protocolVersion: "2024-11-05",
+        capabilities: { tools: {} },
+        serverInfo: {
+          name: "ctm-mcp-server",
+          version: "1.0.0",
+        },
+      },
+    });
+  }
+
+  // MCP initialized notification (no response needed, but acknowledge)
+  if (method === "notifications/initialized") {
+    return jsonResponse({ jsonrpc: "2.0", id, result: {} });
+  }
+
   if (method === "tools/list") {
     const tools = Object.entries(TOOLS).map(([name, t]) => ({
       name,
@@ -270,10 +291,7 @@ async function handleRpc(request, env) {
           .map(([k]) => k),
       },
     }));
-    return new Response(
-      JSON.stringify({ jsonrpc: "2.0", id, result: { tools } }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ jsonrpc: "2.0", id, result: { tools } });
   }
 
   if (method === "tools/call") {
@@ -281,39 +299,36 @@ async function handleRpc(request, env) {
     const toolArgs = params?.arguments || {};
     try {
       const result = await executeTool(env, toolName, toolArgs);
-      return new Response(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id,
-          result: {
-            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-          },
-        }),
-        { headers: { "Content-Type": "application/json" } }
-      );
+      return jsonResponse({
+        jsonrpc: "2.0",
+        id,
+        result: {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        },
+      });
     } catch (err) {
-      return new Response(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id,
-          result: {
-            content: [{ type: "text", text: `Error: ${err.message}` }],
-            isError: true,
-          },
-        }),
-        { headers: { "Content-Type": "application/json" } }
-      );
+      return jsonResponse({
+        jsonrpc: "2.0",
+        id,
+        result: {
+          content: [{ type: "text", text: `Error: ${err.message}` }],
+          isError: true,
+        },
+      });
     }
   }
 
-  return new Response(
-    JSON.stringify({
-      jsonrpc: "2.0",
-      id,
-      error: { code: -32601, message: `Method not found: ${method}` },
-    }),
-    { headers: { "Content-Type": "application/json" } }
-  );
+  return jsonResponse({
+    jsonrpc: "2.0",
+    id,
+    error: { code: -32601, message: `Method not found: ${method}` },
+  });
+}
+
+function jsonResponse(data) {
+  return new Response(JSON.stringify(data), {
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 // ── 5. Worker entry ────────────────────────────────────────────────────
@@ -334,10 +349,7 @@ export default {
 
     // Health check
     if (url.pathname === "/health") {
-      return new Response(
-        JSON.stringify({ status: "ok", tools: Object.keys(TOOLS).length }),
-        { headers: { "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ status: "ok", tools: Object.keys(TOOLS).length });
     }
 
     // Auth check
